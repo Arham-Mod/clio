@@ -1,73 +1,61 @@
-# CLIO - v1.0
 
-Structure-Aware Repository Intelligence System
+# CLIO
 
-A code retrieval and analysis system that understands repositories at the structural level using AST-based parsing, semantic embeddings, dependency expansion, and LLM-augmented reasoning.
+![CLIO cover](img/Clio_-_the_Greek_muse_of_history.jpg)
 
-This project prioritizes retrieval quality, explainability, and engineering rigor over naive text-based approaches.
+A tool that reads a code repository, understands how it's put together, and answers questions about it with actual references back to the source code.
 
----
+## What this is
 
-## Problem Statement
+CLIO is a RAG (retrieval-augmented generation) system built specifically for code repositories. RAG in general means retrieving relevant pieces of information from some source and feeding them to an LLM so it answers from that context instead of guessing. Most RAG tools do this with plain text, splitting it into fixed-size chunks. Code doesn't work well when treated that way, since a chunk boundary can easily land in the middle of a function.
 
-Existing repository RAG systems exhibit several critical limitations:
+CLIO instead parses the repository at the function/class level using Python's AST, keeps track of which functions call which others, and expands retrieval along that call graph before assembling context for the LLM. Every answer returned includes the file, function, and line range it came from.
+
+The problems with generic text-chunking RAG applied to code:
 
 | Issue | Impact |
-|-------|--------|
-| Treat code as plain text | Loss of structural semantics |
-| Use random chunking | Broken function boundaries |
-| Ignore dependencies | Incomplete context |
-| Black-box answers | No traceability, hallucination risk |
+|-------|-------|
+| Code treated as plain text | Loss of structural semantics |
+| Random/fixed-size chunking | Broken function boundaries |
+| No dependency awareness | Incomplete context |
+| No source tracing | No traceability, hallucination risk |
 
-This results in poor retrieval quality, hallucinated answers, and difficult debugging.
+CLIO's pipeline, at a glance:
 
----
+1. Parse the repo into functions/classes via Python AST
+2. Store each chunk with its call relationships intact
+3. Retrieve top-k chunks by embedding similarity
+4. Expand retrieval with callees/callers from the call graph
+5. Assemble grounded context and generate an answer with sources
 
-## Approach
-
-This system implements a structure-aware, dependency-driven architecture:
-
-1. Parses code at function/class granularity using Python AST
-2. Stores structured knowledge with explicit relationships
-3. Retrieves context using semantic similarity and dependency expansion
-4. Generates grounded answers with source attribution
-5. Provides explainability via reference mapping
-
----
-
-## Architecture
+## How it works, step by step
 
 ```
 Repository
     ↓
-AST Parsing (Function/Class Extraction)
+Read and split code into functions/classes (Python AST)
     ↓
-Semantic Embedder (MiniLM 384-dim)
+Convert each piece into a vector (MiniLM, 384 dimensions)
     ↓
-FAISS Vector Index (IndexFlatIP)
+Store vectors in a FAISS index for fast searching
     ↓
-Semantic Retrieval (Top-K Cosine)
+Find the closest matches to a question (cosine similarity)
     ↓
-Dependency Expansion (Call Graph)
+Pull in related functions and callers (dependency expansion)
     ↓
-Context Builder (Token-aware Assembly)
+Assemble all of it into one context, sized to fit
     ↓
-Prompt Builder (Grounded Prompting)
+Build a prompt that keeps the model grounded in that context
     ↓
-Groq LLM (Llama3-8B)
+Send it to Groq's Llama3-8B model
     ↓
-Explainable Answer + Source Attribution
+Return an answer with sources attached
 ```
 
----
+## Core components
 
-## Core Components
-
-### Structure-Aware AST Parsing
-- Extracts functions, classes, and methods with precise line ranges
-- Preserves logical code boundaries
-- Captures function call dependencies
-- Handles syntax errors gracefully
+### AST Parsing
+Extracts functions, classes, and methods with precise line ranges. Preserves logical code boundaries. Captures function call dependencies. Handles syntax errors gracefully (skips the file instead of crashing).
 
 ### Semantic Vector Retrieval
 - Embedder: Sentence Transformers (`all-MiniLM-L6-v2`) → 384-dim vectors
@@ -76,34 +64,21 @@ Explainable Answer + Source Attribution
 - Performance: Sub-millisecond retrieval for thousands of functions
 
 ### Dependency Expansion
-- Analyzes function call relationships
-- Expands retrieved chunks with callees and callers
-- Ensures LLM sees complete execution flow
-- Reduces hallucination through richer context
+Analyzes function call relationships. Expands retrieved chunks with callees and callers so the LLM sees the fuller execution flow, which reduces hallucination compared to isolated snippets.
 
 ### Context Assembly
-- Formats code chunks with metadata (file, function, line range)
-- Token-aware packing to fit within context windows
-- Maintains semantic coherence
+Formats code chunks with metadata (file, function, line range) and packs them token-aware to fit the context window while keeping semantic coherence.
 
 ### Grounded LLM Generation
-- Uses Groq (Llama3-8B) for fast inference
-- Enforces answer-from-context constraint
-- Prevents hallucination via explicit grounding
-- Returns source references for every answer
+Uses Groq (Llama3-8B) for inference. Enforces an answer-from-context constraint so the model can't fall back on assumptions outside what was retrieved.
 
 ### Explainability
-- Maps answers to specific functions, files, and line ranges
-- Enables debugging and verification
-- Improves user trust and transparency
+Maps every answer back to specific functions, files, and line ranges for debugging and verification.
 
 ### Interactive CLI
-- Query the system directly from terminal
-- Real-time response and traceability
+Query the system directly from the terminal with real-time responses and source traceability.
 
----
-
-## Example Output
+## Example
 
 **Query:**
 ```
@@ -130,9 +105,7 @@ core/indexing/faiss_store.py → FaissVectorStore.search() [L29-38]
 core/retrieval/dependency_expander.py → expand_dependencies() [L12-45]
 ```
 
----
-
-## Tech Stack
+## Tech stack
 
 | Component | Technology |
 |-----------|-----------|
@@ -144,9 +117,7 @@ core/retrieval/dependency_expander.py → expand_dependencies() [L12-45]
 | Metadata Store | Pickle + Dict |
 | Logging | Python logging |
 
----
-
-## Project Structure
+## Project structure
 
 ```
 clio/
@@ -162,7 +133,7 @@ clio/
 │   ├── indexing/
 │   │   ├── embedder.py          # MiniLM vector generation
 │   │   ├── faiss_store.py       # FAISS index + search
-│   │   └── metadata_store.py    # Vector ID → metadata mapping
+│   │   └── metadata_store.py    # Vector ID to metadata mapping
 │   │
 │   ├── retrieval/
 │   │   ├── retriever.py         # Semantic search pipeline
@@ -186,32 +157,29 @@ clio/
 ├── cli_app.py                   # Interactive CLI
 ├── requirements.txt
 └── README.md
+```
 
----
-
-## Design Decisions
+## Design decisions
 
 ### Function-Level Chunking
-- Preserves semantic meaning: Functions are logical, intent-preserving units
-- Improves retrieval: Precise boundaries reduce noise
-- Enables explainability: Easy to map answers to specific functions
+- Preserves semantic meaning: functions are logical, intent-preserving units
+- Improves retrieval: precise boundaries reduce noise
+- Enables explainability: easy to map answers to specific functions
 
 ### Dependency Expansion
-- Reflects code structure: Functions rarely work in isolation
+- Reflects code structure: functions rarely work in isolation
 - Provides complete context: LLM receives full call sequences
-- Reduces hallucination: Explicit dependencies prevent fabrication
+- Reduces hallucination: explicit dependencies prevent fabrication
 
 ### FAISS and MiniLM Selection
-- Efficient: Sub-millisecond search on thousands of chunks
-- Local execution: No external API dependency
-- Cost-effective: Small, fast model suitable for embedded systems
+- Efficient: sub-millisecond search on thousands of chunks
+- Local execution: no external API dependency
+- Cost-effective: small, fast model suitable for embedded systems
 
 ### Grounded Prompting
-- Ensures accountability: Model answers only from retrieved context
-- Maintains verifiability: Answers are traceable to source code
-- Builds trust: Users can audit reasoning
-
----
+- Ensures accountability: model answers only from retrieved context
+- Maintains verifiability: answers are traceable to source code
+- Builds trust: users can audit reasoning
 
 ## Requirements
 
@@ -224,26 +192,24 @@ numpy
 python-dotenv
 ```
 
----
+## Installation and usage
 
-## Installation and Usage
-
-1. Clone and install dependencies:
+1. Clone the repository and install dependencies:
 ```bash
 git clone <repo_url>
 cd clio
 pip install -r requirements.txt
 ```
 
-2. Set up environment variables in `.env`:
+2. Set up your environment variables in a `.env` file:
 ```
 GROQ_API_KEY=your_groq_api_key_here
 GITHUB_TOKEN=your_github_token_here  # (optional, for GitHub fetching)
 ```
 
-3. Run the system:
+3. Run it:
 
-Batch analysis of local repository:
+Batch analysis of a local repository:
 ```bash
 python app.py
 ```
@@ -253,14 +219,12 @@ Interactive query mode:
 python cli_app.py
 ```
 
-Fetch repository from GitHub:
+Fetch a repository from GitHub:
 ```bash
 python repoload_test.py --repo_url https://github.com/user/repo
 ```
 
----
-
-## Performance Characteristics
+## Performance
 
 | Metric | Value |
 |--------|-------|
@@ -268,41 +232,33 @@ python repoload_test.py --repo_url https://github.com/user/repo
 | Search Speed | <1ms per query (FAISS) |
 | Memory (Indexed) | ~40KB per function (384-dim float32) |
 | Context Window | ~2K tokens (adjustable) |
-| Inference Time | ~500ms-2s (Groq Llama3-8B) |
-
----
+| Inference Time | ~500ms to 2s (Groq Llama3-8B) |
 
 ## Key Insights
 
-1. Structure over scale: Function-level parsing outperforms naive chunking regardless of LLM capacity
-2. Retrieval quality is critical: The majority of answer quality derives from retrieved context
-3. Dependencies matter: Call graph expansion significantly improves context completeness
-4. Explainability builds trust: Source attribution is essential for enterprise deployments
-5. Modularity simplifies complexity: Decomposing into ingestion, parsing, indexing, retrieval, and generation stages makes complex systems maintainable
-
----
+1. Structure over scale: function-level parsing outperforms naive chunking regardless of LLM capacity
+2. Retrieval quality is critical: most of the answer quality derives from retrieved context
+3. Dependencies matter: call graph expansion significantly improves context completeness
+4. Explainability builds trust: source attribution is essential for enterprise deployments
+5. Modularity simplifies complexity: decomposing into ingestion, parsing, indexing, retrieval, and generation stages makes the system maintainable
 
 ## Future Improvements
 
-- Hybrid retrieval: Combine semantic and keyword search (BM25)
+- Hybrid retrieval: combine semantic and keyword search (BM25)
 - Multi-language support: Tree-sitter integration for Go, Rust, JavaScript
-- Smart ranking: Learning-to-rank for context prioritization
-- Web interface: Visualization of retrieved code and dependencies
-- Runtime call tracing: Dynamic dependency analysis
-- Incremental indexing: Support for streaming code updates
-- Caching layer: Cache frequent queries and dependencies
-
----
+- Smart ranking: learning-to-rank for context prioritization
+- Web interface: visualization of retrieved code and dependencies
+- Runtime call tracing: dynamic dependency analysis
+- Incremental indexing: support for streaming code updates
+- Caching layer: cache frequent queries and dependencies
 
 ## Limitations
 
-- Python-only: Currently supports Python repositories
-- Static analysis: No runtime tracing (AST-based)
-- Embedding model constraints: Retrieval quality limited by MiniLM
-- LLM dependency: Requires Groq API access
-- CLI-only interface: No IDE integration
-
----
+- Python-only: currently supports Python repositories
+- Static analysis: no runtime tracing (AST-based)
+- Embedding model constraints: retrieval quality limited by MiniLM
+- LLM dependency: requires Groq API access
+- CLI-only interface: no IDE integration
 
 ## Capabilities
 
@@ -312,13 +268,11 @@ python repoload_test.py --repo_url https://github.com/user/repo
 - Generates grounded, verifiable answers
 - Provides complete source attribution
 - Scales to thousands of functions
-- Operates locally without external infrastructure  
+- Operates locally without external infrastructure
 
----
+## More examples
 
-## Usage Examples
-
-### Module Analysis
+### Module analysis
 ```bash
 $ python cli_app.py
 Query: What functions are exported from the parsing module?
@@ -331,7 +285,7 @@ Sources:
 core/parsing/ast_parser.py → ASTParser [L1-120]
 ```
 
-### Pipeline Analysis
+### Pipeline analysis
 ```bash
 Query: How does the retrieval pipeline work?
 
@@ -349,26 +303,7 @@ core/retrieval/dependency_expander.py [L15-80]
 core/context_builder/build_context.py [L5-30]
 ```
 
----
 
-## Contributing
-
-Contributions welcome! Focus areas:
-
-- Additional language support
-- Improved chunking strategies
-- Better ranking models
-- UI/visualization
-- Performance optimizations
-
----
 
 ## License
-
-MIT License - See LICENSE file
-
----
-
-## Author
-
-Developed for automated code understanding and structured retrieval in Python repositories.
+Licensed under the Apache License, Version 2.0. See the LICENSE file for details.

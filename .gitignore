@@ -144,6 +144,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Project data
+data/
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -206,6 +209,4 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-
-#remove data 
-data
+cli_app.py
