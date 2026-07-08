@@ -1,7 +1,7 @@
 
 # CLIO
 
-![CLIO cover](img/Clio.jpg)
+![CLIO cover](img/Clio.JPG)
 
 A tool that reads a code repository, understands how it's put together, and answers questions about it with actual references back to the source code.
 
