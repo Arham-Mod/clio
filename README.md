@@ -230,7 +230,7 @@ python repoload_test.py --repo_url https://github.com/user/repo
 |--------|-------|
 | Embedding Speed | ~100 functions/sec (MiniLM) |
 | Search Speed | <1ms per query (FAISS) |
-| Memory (Indexed) | ~40KB per function (384-dim float32) |
+| Memory (Indexed) | ~1.5KB per function (384-dim float32) |
 | Context Window | ~2K tokens (adjustable) |
 | Inference Time | ~500ms to 2s (Groq Llama3-8B) |
 
